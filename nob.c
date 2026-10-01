@@ -97,9 +97,10 @@ static const char *backend_name(Backend backend)
 
 // SDL3's private headers are not safe to concatenate into one translation
 // unit, so sdl_sources_*[] below list the exact upstream files needed and
-// each is compiled to its own object, then archived into SDL_LIB.
-// vendor/sdl/config/ holds a trimmed SDL_build_config.h (video+events+GL
-// only).
+// each is compiled to its own object, then archived into SDL_LIB. The objects
+// are deleted once archived (see build_sdl()); SDL_OBJ_FOLDER only exists
+// while that build runs. vendor/sdl/config/ holds a trimmed
+// SDL_build_config.h (video+events+GL only).
 #define SDL_INCLUDE        "vendor/sdl/include/"
 #define SDL_CONFIG_INCLUDE "vendor/sdl/config/"
 #define SDL_SRC_ROOT       "vendor/sdl/src/"
@@ -578,15 +579,14 @@ static bool check_linux_deps(void)
 // Compiles the vendored FreeGLUT sources into FREEGLUT_BUILD_FOLDER/*.o and
 // archives them into FREEGLUT_LIB (same flags as AntTweakBar-Legacy's
 // build_freeglut(), plus -fPIC so the objects can also go into the shared
-// libGLV). A single unity build was deliberately not used: FreeGLUT's
-// upstream build systems compile every source as a separate translation
-// unit and don't document unity-build safety. Unlike the library objects,
-// these are kept for incremental rebuilds (they never change unless the
-// vendored source does); `./nob -clean` removes them.
+// libGLV), then deletes the objects. A single unity build was deliberately
+// not used: FreeGLUT's upstream build systems compile every source as a
+// separate translation unit and don't document unity-build safety. Only the
+// archive is kept between builds, and the compile is skipped entirely while
+// it is newer than vendor/freeglut - so a plain `./nob` no longer recompiles
+// FreeGLUT at all once it has been built once.
 static bool build_freeglut(const char *nob_exe)
 {
-    if (!nob_mkdir_if_not_exists(FREEGLUT_BUILD_FOLDER)) return false;
-
     Nob_File_Paths sources = {0};
     for (size_t i = 0; i < NOB_ARRAY_LEN(freeglut_core_sources); ++i) {
         nob_da_append(&sources, freeglut_core_sources[i]);
@@ -594,6 +594,27 @@ static bool build_freeglut(const char *nob_exe)
     for (size_t i = 0; i < NOB_ARRAY_LEN(freeglut_platform_sources); ++i) {
         nob_da_append(&sources, freeglut_platform_sources[i]);
     }
+
+    // Dated against the vendored FreeGLUT tree rather than against the objects
+    // it was made from, exactly as build_sdl() does, so the objects need not
+    // survive the build - see that function for the reasoning and the
+    // trade-off.
+    Nob_File_Paths deps = {0};
+    if (!collect_tree_files(&deps, FREEGLUT_SRC_FOLDER)) return false;
+    if (!collect_tree_files(&deps, FREEGLUT_INCLUDE)) return false;
+    add_common_build_deps(&deps, nob_exe);
+
+    if (!build_needed(FREEGLUT_LIB, deps.items, deps.count)) {
+        nob_log(NOB_INFO, "%s is up to date", FREEGLUT_LIB);
+        // Nothing to compile, but an object folder can still be sitting there:
+        // an interrupted compile leaves its objects and a zero-length
+        // `<name>-<hash>.o.tmp` behind, and nothing would ever remove them
+        // again once the archive is current. Sweep it here so the folder never
+        // outlives the build that made it.
+        return remove_folder(FREEGLUT_BUILD_FOLDER);
+    }
+
+    if (!nob_mkdir_if_not_exists(FREEGLUT_BUILD_FOLDER)) return false;
 
     Nob_File_Paths objects = {0};
     for (size_t i = 0; i < sources.count; ++i) {
@@ -628,22 +649,17 @@ static bool build_freeglut(const char *nob_exe)
         nob_da_append(&objects, output);
     }
 
-    Nob_File_Paths lib_inputs = {0};
-    for (size_t i = 0; i < objects.count; ++i) nob_da_append(&lib_inputs, objects.items[i]);
-    add_common_build_deps(&lib_inputs, nob_exe);
-
-    if (!build_needed(FREEGLUT_LIB, lib_inputs.items, lib_inputs.count)) {
-        nob_log(NOB_INFO, "%s is up to date", FREEGLUT_LIB);
-        return true;
-    }
-
     // Remove first: `ar rcs` only adds/replaces members, so an object
     // dropped from the source lists above would otherwise linger.
     if (!delete_if_exists(FREEGLUT_LIB)) return false;
     Nob_Cmd ar = {0};
     nob_cmd_append(&ar, "ar", "rcs", FREEGLUT_LIB);
     for (size_t i = 0; i < objects.count; ++i) nob_cmd_append(&ar, objects.items[i]);
-    return nob_cmd_run(&ar);
+    if (!nob_cmd_run(&ar)) return false;
+
+    // FREEGLUT_LIB now holds everything these objects provided.
+    if (!delete_objects(&objects)) return false;
+    return remove_folder(FREEGLUT_BUILD_FOLDER);
 }
 
 // Compile flags shared by the library objects and every example/test: the
@@ -1014,25 +1030,16 @@ static bool build_sdl_object(const char *source, Nob_File_Paths *common_deps)
 }
 
 // Builds every SDL3 source (plus AntTweakBarC99's small sdl_stubs.c) and
-// archives them into SDL_LIB. Unlike glfw.o/sfml.o these are kept after the
-// build: recompiling ~140 files on every run would be far too slow.
-// `./nob -clean` removes them.
+// archives them into SDL_LIB, then deletes the objects: only the archive is
+// kept between builds, and it is skipped entirely while it is newer than the
+// vendored SDL3 tree. A change there does rebuild all ~150 files at once
+// (about 20 s) rather than just the one that changed - the same all-or-nothing
+// trade-off glfw.o and sfml.o already make, and vendored sources only change
+// when they are re-vendored. `./nob -clean` removes the archive.
 static bool build_sdl(const char *nob_exe)
 {
     if (!check_linux_sdl_deps()) return false;
 
-    if (!nob_mkdir_if_not_exists(SDL_OBJ_FOLDER)) return false;
-
-    Nob_File_Paths common_deps = {0};
-    if (!collect_tree_files(&common_deps, SDL_CONFIG_INCLUDE)) return false;
-    add_common_build_deps(&common_deps, nob_exe);
-
-    Nob_File_Paths objects = {0};
-    for (size_t i = 0; i < NOB_ARRAY_LEN(sdl_sources_common); ++i) {
-        const char *source = nob_temp_sprintf("%s%s", SDL_SRC_ROOT, sdl_sources_common[i]);
-        if (!build_sdl_object(source, &common_deps)) return false;
-        nob_da_append(&objects, object_path(SDL_OBJ_FOLDER, source));
-    }
 #if defined(_WIN32)
     const char **sdl_sources_platform = sdl_sources_win32;
     size_t sdl_sources_platform_count = NOB_ARRAY_LEN(sdl_sources_win32);
@@ -1043,28 +1050,59 @@ static bool build_sdl(const char *nob_exe)
     const char **sdl_sources_platform = sdl_sources_linux;
     size_t sdl_sources_platform_count = NOB_ARRAY_LEN(sdl_sources_linux);
 #endif
-    for (size_t i = 0; i < sdl_sources_platform_count; ++i) {
-        const char *source = nob_temp_sprintf("%s%s", SDL_SRC_ROOT, sdl_sources_platform[i]);
-        if (!build_sdl_object(source, &common_deps)) return false;
-        nob_da_append(&objects, object_path(SDL_OBJ_FOLDER, source));
+
+    Nob_File_Paths sources = {0};
+    for (size_t i = 0; i < NOB_ARRAY_LEN(sdl_sources_common); ++i) {
+        nob_da_append(&sources, nob_temp_sprintf("%s%s", SDL_SRC_ROOT, sdl_sources_common[i]));
     }
-    if (!build_sdl_object(SDL_STUB_SRC, &common_deps)) return false;
-    nob_da_append(&objects, object_path(SDL_OBJ_FOLDER, SDL_STUB_SRC));
+    for (size_t i = 0; i < sdl_sources_platform_count; ++i) {
+        nob_da_append(&sources, nob_temp_sprintf("%s%s", SDL_SRC_ROOT, sdl_sources_platform[i]));
+    }
+    nob_da_append(&sources, SDL_STUB_SRC);
 
-    Nob_File_Paths archive_inputs = {0};
-    for (size_t i = 0; i < objects.count; ++i) nob_da_append(&archive_inputs, objects.items[i]);
-    add_common_build_deps(&archive_inputs, nob_exe);
+    // Date the archive against the vendored SDL3 tree itself, not against the
+    // objects it was made from, so the objects do not have to survive between
+    // builds: ~150 of them (about 2 MB) would otherwise sit in SDL_OBJ_FOLDER
+    // holding nothing the archive does not already hold. The whole source tree
+    // is scanned, not just the files compiled below, so that a change to any
+    // vendored header is picked up too - stat()ing a few thousand paths costs
+    // milliseconds next to the ~20 s compile it guards.
+    Nob_File_Paths deps = {0};
+    if (!collect_tree_files(&deps, SDL_SRC_ROOT)) return false;
+    if (!collect_tree_files(&deps, SDL_INCLUDE)) return false;
+    if (!collect_tree_files(&deps, SDL_CONFIG_INCLUDE)) return false;
+    nob_da_append(&deps, SDL_STUB_SRC);
+    add_common_build_deps(&deps, nob_exe);
 
-    if (!build_needed(SDL_LIB, archive_inputs.items, archive_inputs.count)) {
+    if (!build_needed(SDL_LIB, deps.items, deps.count)) {
         nob_log(NOB_INFO, "%s is up to date", SDL_LIB);
-        return true;
+        // Sweep a folder left by an interrupted compile - see build_freeglut().
+        return remove_folder(SDL_OBJ_FOLDER);
+    }
+
+    if (!nob_mkdir_if_not_exists(SDL_OBJ_FOLDER)) return false;
+
+    // Per-object deps as well, so a build interrupted part way through resumes
+    // instead of recompiling what it already finished.
+    Nob_File_Paths common_deps = {0};
+    if (!collect_tree_files(&common_deps, SDL_CONFIG_INCLUDE)) return false;
+    add_common_build_deps(&common_deps, nob_exe);
+
+    Nob_File_Paths objects = {0};
+    for (size_t i = 0; i < sources.count; ++i) {
+        if (!build_sdl_object(sources.items[i], &common_deps)) return false;
+        nob_da_append(&objects, object_path(SDL_OBJ_FOLDER, sources.items[i]));
     }
 
     if (!delete_if_exists(SDL_LIB)) return false;
     Nob_Cmd cmd = {0};
     nob_cmd_append(&cmd, "ar", "rcs", SDL_LIB);
     for (size_t i = 0; i < objects.count; ++i) nob_cmd_append(&cmd, objects.items[i]);
-    return nob_cmd_run(&cmd);
+    if (!nob_cmd_run(&cmd)) return false;
+
+    // SDL_LIB now holds everything these objects provided.
+    if (!delete_objects(&objects)) return false;
+    return remove_folder(SDL_OBJ_FOLDER);
 }
 
 static void append_sdl_libs(Nob_Cmd *cmd)
@@ -1261,7 +1299,8 @@ static bool build_examples(const char *nob_exe, bool dynamic, Backend backend)
 
     // glfw.o/sfml.o are cheap single unity objects, only needed while linking
     // the examples above - remove them rather than leave stale leftovers (as
-    // in AntTweakBarC99). SDL_LIB is deliberately kept (see build_sdl()).
+    // in AntTweakBarC99). SDL3 cleans up after itself inside build_sdl(); the
+    // archive it leaves behind is what the examples link against.
     if (backend == BACKEND_GLFW && !delete_if_exists(GLFW_OBJ)) return false;
     if (backend == BACKEND_SFML && !delete_if_exists(SFML_OBJ)) return false;
 
