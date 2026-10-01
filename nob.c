@@ -658,6 +658,12 @@ static void append_glv_flags(Nob_Cmd *cmd, const char *cxx_std)
     // GLV calls no GLU function, so freeglut_std.h's own GL/GLU includes are
     // not needed (and GLU would be one more system package on Linux).
     nob_cmd_append(cmd, "-DFREEGLUT_NO_GL_INCLUDE");
+    // M_PI and friends are not ISO C/C++, and -std=c++NN defines __STRICT_ANSI__,
+    // under which MinGW's <math.h> hides them behind _USE_MATH_DEFINES. glibc and
+    // Apple's libc expose them regardless, which is why only MinGW needs this; the
+    // macro is simply unknown - and harmless - on the other two platforms. Four
+    // examples per backend (chladni, graphicsData, spaceCurve, widgets) use M_PI.
+    nob_cmd_append(cmd, "-D_USE_MATH_DEFINES");
 #if defined(_WIN32)
     nob_cmd_append(cmd, "-DFREEGLUT_STATIC");
 #elif defined(__APPLE__)
