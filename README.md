@@ -43,7 +43,46 @@ Everything the build produces goes into ./build:
 	build/examples/shared-<toolkit>/ dynamically linked examples
 	build/tests/                    test programs
 
-Programs linked with `-dynamic` must be able to find the shared library at run time. Run them from the base directory (macOS), set `LD_LIBRARY_PATH=build/lib` (Linux), or put `libGLV.dll` next to the executable or on `PATH` (Windows).
+Programs linked with `-dynamic` are not self-contained: unlike the static build, they have to find
+`build/lib/libGLV.{dll,so,dylib}` at run time. Rather than copying that file next to every executable or
+permanently adding `build/lib` to your system-wide search path, point the loader at it for the current
+shell session or command only. The snippets below use the GLFW3 `widgets` example; the same pattern
+applies to any example under any toolkit's `shared-<toolkit>` folder.
+
+**Windows (Command Prompt)**
+
+	cd build\examples\shared-glfw
+	set PATH=..\..\lib;%PATH%
+	widgets_glfw.exe
+
+**Windows (PowerShell)**
+
+	cd build\examples\shared-glfw
+	$env:PATH = "..\..\lib;$env:PATH"
+	.\widgets_glfw.exe
+
+**Linux (bash)**
+
+	cd build/examples/shared-glfw
+	LD_LIBRARY_PATH=../../lib ./widgets_glfw
+
+**macOS (bash)**
+
+	cd build/examples/shared-glfw
+	DYLD_LIBRARY_PATH=../../lib ./widgets_glfw
+
+The `set PATH=`/`$env:PATH` assignment only lasts for the current Command Prompt/PowerShell session; the
+`LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` prefix form only applies to that single command. Either way your
+system-wide search path is left untouched, and no `.dll`/`.so`/`.dylib` has to be copied anywhere.
+
+On Windows that same session-scoped `PATH` prepend is also how you make sure the right GCC runtime gets
+loaded. Both the static and the dynamic examples need MinGW's own `libstdc++-6.dll` and
+`libgcc_s_seh-1.dll`, and unrelated programs (gnuplot, for one) install older copies of those under
+directories that can come earlier on `PATH`. An example that starts and exits immediately with code
+`0xC0000139` (`STATUS_ENTRYPOINT_NOT_FOUND`) is loading one of those stale copies; put your MinGW `bin`
+directory first to fix it:
+
+	set PATH=C:\mingw64\bin;..\..\lib;%PATH%
 
 
 2.2 Compiling Direct From Source
