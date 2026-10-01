@@ -2373,7 +2373,17 @@ NOBDEF int nob_needs_rebuild(const char *output_path, const char **input_paths, 
 #ifdef _WIN32
     BOOL bSuccess;
 
-    HANDLE output_path_fd = CreateFile(output_path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
+    // LOCAL CHANGE (not upstream nob.h): the two CreateFile() calls below originally
+    // passed dwShareMode = 0, i.e. deny-all sharing, which makes an up-to-date check
+    // fail with ERROR_SHARING_VIOLATION whenever any other process merely has the file
+    // open - Dropbox or OneDrive uploading a freshly written archive, an antivirus
+    // scanner, or a parallel compiler reading the same input. nob_needs_rebuild() then
+    // returns -1 and aborts the whole build intermittently. This is a read-only
+    // timestamp probe, so it shares like the POSIX branch's stat() below, which never
+    // conflicts with other readers or writers. Re-apply when upgrading nob.h.
+    HANDLE output_path_fd = CreateFile(output_path, GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
     if (output_path_fd == INVALID_HANDLE_VALUE) {
         // NOTE: if output does not exist it 100% must be rebuilt
         if (GetLastError() == ERROR_FILE_NOT_FOUND) return 1;
@@ -2390,7 +2400,9 @@ NOBDEF int nob_needs_rebuild(const char *output_path, const char **input_paths, 
 
     for (size_t i = 0; i < input_paths_count; ++i) {
         const char *input_path = input_paths[i];
-        HANDLE input_path_fd = CreateFile(input_path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
+        HANDLE input_path_fd = CreateFile(input_path, GENERIC_READ, // LOCAL CHANGE: see above
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
         if (input_path_fd == INVALID_HANDLE_VALUE) {
             // NOTE: non-existing input is an error cause it is needed for building in the first place
             nob_log(NOB_ERROR, "Could not open file %s: %s", input_path, nob_win32_error_message(GetLastError()));
