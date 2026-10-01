@@ -90,14 +90,11 @@
 	#define GLV_OPENGL
 
 	#include <time.h>
-	#include <GL/glew.h>
-	#include <GL/gl.h>
-	#include <GL/glext.h>
+	#include <glad/glad.h>	// vendored loader (vendor/glad), replaces GLEW
 
 	#define GLV_PLATFORM_INIT_CONTEXT\
-		{	GLenum err = glewInit();\
-			if(GLEW_OK != err){\
-  				fprintf(stderr, "GLEW Init Error: %s\n", glewGetErrorString(err));\
+		{	if(!gladLoadGL()){\
+  				fprintf(stderr, "GLAD Init Error: could not load OpenGL functions\n");\
 			}\
 		}
 
@@ -108,20 +105,14 @@
 	#define GLV_PLATFORM_WIN
 	#define GLV_OPENGL
 
-	#ifndef __MINGW32__
-		#define GLEW_NO_GLU // GLU not used and throws errors with Mingw-w64
-	#endif
-	#include <GL/glew.h>
-	#include <GL/gl.h>
+	#include <glad/glad.h>	// vendored loader (vendor/glad), replaces GLEW
 
-	#pragma comment( lib, "glew32.lib")
 	#pragma comment( lib, "winmm.lib")
 	#pragma comment( lib, "opengl32.lib" )
-	
+
 	#define GLV_PLATFORM_INIT_CONTEXT\
-		{	GLenum err = glewInit();\
-			if(GLEW_OK != err){\
-  				fprintf(stderr, "GLEW Init Error: %s\n", glewGetErrorString(err));\
+		{	if(!gladLoadGL()){\
+  				fprintf(stderr, "GLAD Init Error: could not load OpenGL functions\n");\
 			}\
 		}
 

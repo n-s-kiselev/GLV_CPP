@@ -702,6 +702,21 @@ int main(){
 		w.setDataFromString("\"test\"");	assert(w.getValue() == "test");
 	}
 
+	// A vertical Label holds its text extent transposed and stays in place
+	// when refitted (value assignment, resize); it used to drift down by w-h
+	// on every refit and recurse without end on setValue().
+	{
+		Label h("Label"), v("Label", true);
+		assert(v.w == h.h && v.h == h.w);
+
+		space_t l = v.l, t = v.t;
+		for(int i=0; i<3; ++i) v.setValue("Label");
+		assert(v.l == l && v.t == t && v.w == h.h && v.h == h.w);
+
+		v.vertical(false);
+		assert(v.w == h.w && v.h == h.h);
+	}
+
 	{
 
 //		{

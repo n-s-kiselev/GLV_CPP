@@ -1,4 +1,10 @@
 build/
+/nob
+/nob.exe
+/nob.old
+/nob.exe.old
+/docs/
+/tasks/
 xcuserdata
 doxygen_objdb_*
 .DS_Store

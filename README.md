@@ -15,64 +15,35 @@ The source code can either be built into a library or directly compiled from sou
 2.1 Building a Library
 ----------------------------------------
 
-### Make (Linux, OS X)
+GLV is built with a single cross-platform [nob.h](https://github.com/tsoding/nob.h) build script, `nob.c`, on Linux, macOS and Windows (MinGW). It needs only a C/C++ compiler: no Make, CMake or IDE project. First bootstrap the build program once:
 
-First, ensure that the correct build options are set. These can be set directly in Makefile.config or passed in as options to Make as OPTION=value. Once Make has been configured properly, run
+	cc nob.c -o nob        (or: gcc nob.c -o nob)
 
-	make
+After that, `nob` rebuilds itself automatically whenever `nob.c` changes. The available commands are:
 
-to build the library.
+	./nob                    - builds the library
+	./nob -examples-glut     - builds the GLUT examples (requires ./nob first)
+	./nob -examples-glfw     - builds the GLFW3 examples
+	./nob -examples-sdl      - builds the SDL3 examples
+	./nob -examples-sfml     - builds the SFML3 examples
+	./nob -examples-<b> -dynamic - same, but links against the shared library
+	./nob -test              - builds and runs test/test_units.cpp
+	./nob -clean             - removes the build folder
+	./nob -help              - lists all options
 
-There are several other targets within Makefile. These are:
+The same 25 examples exist once per windowing toolkit, as examples/<toolkit>/<name>_<toolkit>.cpp. The GLUT examples use GLV's own Window/Application binding. The GLFW3, SDL3 and SFML3 examples create their own window and run their own main loop, and pass events to GLV through the small header-only helper in their folder (glv_glfw.h, glv_sdl.h, glv_sfml.h). GLFW3, SDL3 and SFML3 are vendored in vendor/ and built from source; the GLV library itself links none of them.
 
-	make all		- builds library and tests
-	make clean		- removes binaries from build folder
-	make test		- builds the unit tests and other empirical testing code
-	make test/x.cpp		- builds and runs source file 'x'
-	make example/x.cpp	- builds and runs source file 'x'
+Everything the build produces goes into ./build:
 
-Binaries are located in the directory ./build. 
+	build/lib/libGLV.a              static library
+	build/lib/libfreeglut.a         vendored FreeGLUT (link together with libGLV.a)
+	build/lib/libGLV.{so,dylib,dll} shared library (FreeGLUT included)
+	build/include/GLV/              public headers
+	build/examples/static-<toolkit>/ statically linked examples (glut, glfw, sdl, sfml)
+	build/examples/shared-<toolkit>/ dynamically linked examples
+	build/tests/                    test programs
 
-
-### Xcode (OS X)
-
-1. Open osx/GLV.xcodeproj
-2. Select 'ALL' as the active target and build.
-
-A static library and framework will be in project build folder.
-
-
-### MS Visual Studio (Windows)
-
-There is no Visual Studio project included, but it is simple to set one up by creating your own by selecting "Console Application" and then choosing "empty project." You'll then need to add the GLV source files and OpenGL and GLEW (and if using Window, GLUT) dependencies.
-
-Obtain GLEW from
-  http://glew.sourceforge.net/
-
-To use the shared library version of GLEW, you need to copy the headers and libraries into their destination directories. On Windows this typically boils down to copying:
-
-bin/glew32.dll		to    	%SystemRoot%/system32
-lib/glew32.lib		to    	{VC Root}/Lib
-include/GL/glew.h	to    	{VC Root}/Include/GL
-include/GL/wglew.h	to    	{VC Root}/Include/GL
-
-
-Obtain GLUT from
-  http://www.xmission.com/%7Enate/glut.html
-
-1. Put the file "glut32.dll" in "C:\WINDOWS\system32"
-2. Put the file "glut.h" into 
-
-C:\Program Files\Microsoft Visual Studio 10.0\VC\Include\GL
-
-3. Put the file "glut32.lib" into
-C:\Program Files\Microsoft Visual Studio 10.0\VC\lib
-
-Configure the linker using this 
-
-Project -> Configuration Properties -> Linker -> Input
-add opengl32.lib; glut32.lib; glu32.lib; in "additional dependencies"
-
+Programs linked with `-dynamic` must be able to find the shared library at run time. Run them from the base directory (macOS), set `LD_LIBRARY_PATH=build/lib` (Linux), or put `libGLV.dll` next to the executable or on `PATH` (Windows).
 
 
 2.2 Compiling Direct From Source
@@ -87,7 +58,17 @@ Make sure to pass in the following flags to the compiler:
 
 2.3 Dependencies
 ----------------------------------------
-GLV requires only OpenGL, GLU, and GLEW (Linux only). There are no other dependencies, unless a window binding is used, such as GLUT.
+GLV requires only OpenGL. On Linux and Windows the OpenGL functions are loaded with GLAD, which is vendored in vendor/glad and compiled into the library. The GLUT window binding uses FreeGLUT, which is vendored in vendor/freeglut and built from source by `nob.c` on every platform, so no GLUT installation is needed. The GLFW3, SDL3 and SFML3 toolkits used by the examples are vendored as well.
+
+- macOS: nothing to install besides the Xcode command line tools.
+- Linux (Debian/Ubuntu): `sudo apt install libgl-dev libx11-dev libxrandr-dev libxi-dev libxxf86vm-dev` for the library itself. The example toolkits need some more X11 development headers on top of that:
+
+	- GLFW3: `libxcursor-dev libxinerama-dev libxext-dev`
+	- SDL3: `libxcursor-dev libxext-dev libxfixes-dev libxss-dev`
+	- SFML3: `libxcursor-dev libudev-dev`
+
+	`./nob` checks for every header it needs before compiling and names the package that provides any missing one. Only the headers are required for SDL3: it loads the X11 extension libraries at run time, so a machine without, say, libXcursor installed loses that feature instead of failing to start. The X11 backend is the only one built for SDL3 and SFML3; both run under Wayland through XWayland.
+- Windows (MSYS2 MinGW-w64): `pacman -S mingw-w64-x86_64-gcc`.
 
 
 
@@ -96,8 +77,11 @@ GLV requires only OpenGL, GLU, and GLEW (Linux only). There are no other depende
 
 	GLV/		GLV headers
 	src/		GLV source
+	nob.c		build script (see section 2.1)
+	vendor/		vendored third-party code (nob.h, GLAD, FreeGLUT, GLFW3, SDL3, SFML3)
 
-	example/	example source demonstrating various features of GLV
+	examples/	example source demonstrating various features of GLV,
+			one folder per windowing toolkit (glut, glfw, sdl, sfml)
 	test/		unit and visual testing source
 
 	doc/		documentation of GLV source, design, etc.

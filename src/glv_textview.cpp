@@ -66,8 +66,10 @@ Label& Label::stroke(float pixels){
 
 Label& Label::vertical(bool v){
 	if(v != mVertical){
-		rotateRect();
+		// Set the orientation first: rotateRect() resizes, and the resulting
+		// onResize() -> fitExtent() must fit the new orientation.
 		mVertical = v;
+		rotateRect();
 	}
 	return *this;
 }
@@ -76,7 +78,10 @@ void Label::onDraw(GLV& g){
 	using namespace glv::draw;
 	lineWidth(stroke());
 	color(colors().text);
-	if(mVertical){ translate(0,h); rotate(0,0,-90); }
+	// Qualified: an unqualified translate(x,y) resolves to the inherited
+	// Rect::translate() member (moving the label down by h every frame), not
+	// to draw::translate(), because member names hide using-directive names.
+	if(mVertical){ draw::translate(0,h); draw::rotate(0,0,-90); }
 	font().render(
 		g.graphicsData(),
 		data().toString().c_str(),
@@ -93,16 +98,20 @@ void Label::fitExtent(){
 	float tw, th;
 	font().getBounds(tw,th, data().toString().c_str());
 
+	// Extent in the label's own orientation: a vertical label is drawn rotated
+	// by -90 degrees, so its rect holds the padded text extent transposed.
+	// Computing it directly (rather than fitting horizontally and then calling
+	// rotateRect()) keeps this idempotent: extent() calls onResize(), which
+	// calls fitExtent() again, and rotateRect() shifts the label down by w-h
+	// each time, so vertical labels used to drift out of their parent.
+	space_t fw = tw + paddingX()*2;
+	space_t fh = th + paddingY()*2;
+	if(mVertical){ space_t tmp = fw; fw = fh; fh = tmp; }
+
 	// align text by translating its current position
-	auto dw = tw - (w - paddingX()*2);
-	auto dh = th - (h - paddingY()*2);
-	translate(-dw*mAlignX, -dh*mAlignY);
+	translate(-(fw - w)*mAlignX, -(fh - h)*mAlignY);
 
-	tw += paddingX()*2;
-	th += paddingY()*2;
-
-	extent(tw, th);
-	if(mVertical) rotateRect();
+	extent(fw, fh);
 }
 
 void Label::rotateRect(){

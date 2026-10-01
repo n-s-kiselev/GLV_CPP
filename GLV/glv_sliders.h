@@ -354,12 +354,23 @@ TEM void SliderGrid<Dim>::onDraw(GLV& g){
 	lineWidth(1);
 	frame(cx * w * rDim, (Dim-cy-1) * h * rDim, (cx+1) * w * rDim, (Dim-cy) * h * rDim);
 
-	lineStippling(true);
-	lineStipple(1, 0xAAAA);
-	grid(g.graphicsData(), 0,0,w,h,Dim,Dim, false);
-	shape(Lines,0,h,w,0);
-
-	lineStippling(false);
+	// Dotted cell grid and diagonal, drawn as points every 2 pixels (the look
+	// of lineStipple(1, 0xAAAA)) rather than stippled lines: OpenGL on macOS
+	// is emulated on Metal, which has no line stipple, so enabling it forces
+	// software vertex processing and makes the driver log "FALLBACK" messages.
+	GraphicsData& gd = g.graphicsData();
+	gd.reset();
+	for(int i=1; i<Dim; ++i){
+		float x = w*i*rDim, y = h*i*rDim;
+		for(float p=0; p<h; p+=2) gd.addVertex2(x, p);
+		for(float p=0; p<w; p+=2) gd.addVertex2(p, y);
+	}
+	int n = (int)((w > h ? w : h) / 2);
+	for(int i=0; i<=n; ++i){
+		float s = n ? (float)i/n : 0.f;
+		gd.addVertex2(s*w, h - s*h);
+	}
+	paint(Points, gd);
 	/*
 	float dx = rDim*w;
 	float dy = rDim*h;

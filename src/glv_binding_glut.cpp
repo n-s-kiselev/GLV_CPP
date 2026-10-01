@@ -406,6 +406,14 @@ void Window::implCtor(unsigned l, unsigned t, unsigned w, unsigned h){
     //mImpl.reset(new WindowImpl(this, winID));
 	mImpl = new Impl(this, winID);
 
+	// Load the platform's GL functions as soon as a context exists. The
+	// scheduleDraw() below issues the first GL call (Impl::draw()'s
+	// glClear), and that happens before the constructor reaches setGLV()
+	// -> onWindowCreate(), where the loader would otherwise run. Without
+	// this, every GLAD function pointer is still null at that point on
+	// Linux and Windows; macOS links GL directly and never noticed.
+	GLV_PLATFORM_INIT_CONTEXT
+
 	registerCBs();
 	mImpl->scheduleDraw();
 }
