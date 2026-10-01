@@ -1,10 +1,25 @@
 # GLV (Graphics Library of Views)
 ### GUI Building Toolkit
 
+> **This is an experimental fork, not the main GLV repository.** Upstream development happens at
+> [AlloSphere-Research-Group/GLV](https://github.com/AlloSphere-Research-Group/GLV). This branch exists to
+> experiment with connecting GLV to different windowing backends and with building and running the result on
+> Linux, macOS and Windows from a single build script that needs nothing but a C/C++ compiler. It therefore
+> carries changes that are not part of upstream GLV — a vendored `nob.c` build system in place of the
+> Makefiles and the Xcode project, vendored copies of every windowing toolkit, GLAD in place of GLEW, and one
+> set of examples per backend. Treat it as a testing ground; for production use, prefer upstream.
+
 
 1. About
 ========================================
-GLV (Graphics Library of Views) is a GUI building toolkit written in C++ for Linux, OSX, and Win32. GLV is specially designed for creating interfaces to real-time, multimedia applications using hardware accelerated graphics. GLV has no dependencies on other libraries other than OpenGL which is provided by all modern operating systems. Although windowing is technically not a part of GLV, it does provide an abstraction layer for creating bindings to a particular windowing system for creating an OpenGL context and getting mouse and keyboard input. A binding to GLUT is currently provided. 
+GLV (Graphics Library of Views) is a GUI building toolkit written in C++ for Linux, OSX, and Win32. GLV is specially designed for creating interfaces to real-time, multimedia applications using hardware accelerated graphics. GLV has no dependencies on other libraries other than OpenGL which is provided by all modern operating systems. Although windowing is technically not a part of GLV, it does provide an abstraction layer for creating bindings to a particular windowing system for creating an OpenGL context and getting mouse and keyboard input.
+
+A binding to GLUT is provided inside the library itself, implemented against the vendored FreeGLUT. Three
+further backends — [GLFW3](https://www.glfw.org/), [SDL3](https://www.libsdl.org/) and
+[SFML3](https://www.sfml-dev.org/) — are demonstrated by the examples rather than built into the library:
+there, the application owns the window and the main loop and feeds events to GLV through a small header-only
+helper (see section 2.1). All four toolkits are vendored and built from source, so a fresh clone needs none
+of them installed. All four backends have been built and run on Linux (X11), macOS and Windows (MinGW-w64).
 
 
 2. Compilation Instructions
