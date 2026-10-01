@@ -122,7 +122,8 @@ GLV requires only OpenGL. On Linux and Windows the OpenGL functions are loaded w
 	- GLFW3: `libxcursor-dev libxinerama-dev libxext-dev`
 	- SDL3: `libxcursor-dev libxext-dev libxfixes-dev libxss-dev`
 	- SFML3: `libxcursor-dev libudev-dev`
-	- Windows (MSYS2 MinGW-w64): `pacman -S mingw-w64-x86_64-gcc`.
+
+- Windows (MSYS2 MinGW-w64): `pacman -S mingw-w64-x86_64-gcc`.
 
 However, in most cases, you should not worry much about those dependencies because `./nob` checks for every header it needs before compiling and names the package that provides any missing one. Only the headers are required for SDL3: it loads the X11 extension libraries at runtime, so a machine without, say, libXcursor installed loses that feature instead of failing to start. The X11 backend is the only one built for SDL3 and SFML3; both run under Wayland through XWayland.
 
