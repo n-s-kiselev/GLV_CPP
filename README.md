@@ -12,8 +12,7 @@ The changes that are not part of upstream GLV:
 - set of examples per each backend. 
 
 
-1. About
-========================================
+## 1. About
 GLV (Graphics Library of Views) is a GUI building toolkit written in C++ for Linux, OSX, and Win32. GLV is specially designed for creating interfaces to real-time, multimedia applications using hardware accelerated graphics. GLV has no dependencies on other libraries other than OpenGL which is provided by all modern operating systems. Although windowing is technically not a part of GLV, it does provide an abstraction layer for creating bindings to a particular windowing system for creating an OpenGL context and getting mouse and keyboard input.
 
 A binding to GLUT is provided inside the library itself, implemented against the vendored FreeGLUT. Three
@@ -24,13 +23,11 @@ helper (see section 2.1). All four toolkits are vendored and built from source, 
 of them installed. All four backends have been built and run on Linux (X11), macOS and Windows (MinGW-w64).
 
 
-2. Compilation Instructions
-========================================
+## 2. Compilation Instructions
 
 The source code can either be built into a library or directly compiled from source into an application. In the following instructions, the base directory is where this README file is located.
 
-2.1 Building a Library
-----------------------------------------
+### 2.1 Building a Library
 
 GLV is built with a single cross-platform [nob.h](https://github.com/tsoding/nob.h) build script, `nob.c`, on Linux, macOS and Windows (MinGW). It needs only a C/C++ compiler: no Make, CMake or IDE project. First bootstrap the build program once:
 
@@ -102,8 +99,7 @@ directory first to fix it:
 	set PATH=C:\mingw64\bin;..\..\lib;%PATH%
 
 
-2.2 Compiling Direct From Source
-----------------------------------------
+### 2.2 Compiling Direct From Source
 GLV can easily be compiled directly from source into an existing project.
 
 Make sure to pass in the following flags to the compiler:
@@ -112,8 +108,7 @@ Make sure to pass in the following flags to the compiler:
 	-fpeel-loops
 
 
-2.3 Dependencies
-----------------------------------------
+### 2.3 Dependencies
 GLV requires only OpenGL. On Linux and Windows the OpenGL functions are loaded with GLAD, which is vendored in vendor/glad and compiled into the library. The GLUT window binding uses FreeGLUT, which is vendored in vendor/freeglut and built from source by `nob.c` on every platform, so no GLUT installation is needed. The GLFW3, SDL3 and SFML3 toolkits used by the examples are vendored as well.
 
 - macOS: I found nothing to install besides the Xcode command line tools.
@@ -130,8 +125,7 @@ However, in most cases, you should not worry much about those dependencies becau
 
 
 
-3. File Organization
-========================================
+## 3. File Organization
 
 	GLV/		GLV headers
 	src/		GLV source
