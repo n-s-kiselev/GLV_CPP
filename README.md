@@ -1,13 +1,15 @@
 # GLV (Graphics Library of Views)
 ### GUI Building Toolkit
 
-> **This is an experimental fork, not the main GLV repository.** Upstream development happens at
-> [AlloSphere-Research-Group/GLV](https://github.com/AlloSphere-Research-Group/GLV). This branch exists to
-> experiment with connecting GLV to different windowing backends and with building and running the result on
-> Linux, macOS and Windows from a single build script that needs nothing but a C/C++ compiler. It therefore
-> carries changes that are not part of upstream GLV — a vendored `nob.c` build system in place of the
-> Makefiles and the Xcode project, vendored copies of every windowing toolkit, GLAD in place of GLEW, and one
-> set of examples per backend. Treat it as a testing ground; for production use, prefer upstream.
+This is an experimental fork made for my own purposes.  Upstream development goes at [AlloSphere-Research-Group/GLV](https://github.com/AlloSphere-Research-Group/GLV). 
+Here I'm experimenting with connecting GLV to different windowing backends and with building and running the result on Linux, macOS and Windows from a single build script that needs nothing but a C/C++ compiler (thank to [Mr. Tsoding](https://github.com/tsoding) and his [nob.h](https://github.com/tsoding/nob.h)). 
+
+The changes that are not part of upstream GLV:
+
+- a crossplatform vendored build system (`nob.h`) in place of the Makefiles and the Xcode project, 
+- vendored copies of every windowing toolkit ([GLFW3](https://www.glfw.org/), [SDL3](https://www.libsdl.org/), and
+[SFML3](https://www.sfml-dev.org/)), GLAD in place of GLEW, and
+- set of examples per each backend. 
 
 
 1. About
@@ -114,15 +116,16 @@ Make sure to pass in the following flags to the compiler:
 ----------------------------------------
 GLV requires only OpenGL. On Linux and Windows the OpenGL functions are loaded with GLAD, which is vendored in vendor/glad and compiled into the library. The GLUT window binding uses FreeGLUT, which is vendored in vendor/freeglut and built from source by `nob.c` on every platform, so no GLUT installation is needed. The GLFW3, SDL3 and SFML3 toolkits used by the examples are vendored as well.
 
-- macOS: nothing to install besides the Xcode command line tools.
+- macOS: I found nothing to install besides the Xcode command line tools.
 - Linux (Debian/Ubuntu): `sudo apt install libgl-dev libx11-dev libxrandr-dev libxi-dev libxxf86vm-dev` for the library itself. The example toolkits need some more X11 development headers on top of that:
 
 	- GLFW3: `libxcursor-dev libxinerama-dev libxext-dev`
 	- SDL3: `libxcursor-dev libxext-dev libxfixes-dev libxss-dev`
 	- SFML3: `libxcursor-dev libudev-dev`
+	- Windows (MSYS2 MinGW-w64): `pacman -S mingw-w64-x86_64-gcc`.
 
-	`./nob` checks for every header it needs before compiling and names the package that provides any missing one. Only the headers are required for SDL3: it loads the X11 extension libraries at run time, so a machine without, say, libXcursor installed loses that feature instead of failing to start. The X11 backend is the only one built for SDL3 and SFML3; both run under Wayland through XWayland.
-- Windows (MSYS2 MinGW-w64): `pacman -S mingw-w64-x86_64-gcc`.
+However, in most cases, you should not worry much about those dependencies because `./nob` checks for every header it needs before compiling and names the package that provides any missing one. Only the headers are required for SDL3: it loads the X11 extension libraries at runtime, so a machine without, say, libXcursor installed loses that feature instead of failing to start. The X11 backend is the only one built for SDL3 and SFML3; both run under Wayland through XWayland.
+
 
 
 
